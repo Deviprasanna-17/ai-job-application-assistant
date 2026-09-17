@@ -1,6 +1,8 @@
 # Fake Job Posting Detection using Machine Learning
 
-An NLP-based machine learning tool that detects fraudulent job postings, built as part of an end-to-end job application assistant project.
+🔗 **Live Demo:** [Try the app here](https://ai-job-application-assistant-bjqd8degdbjrewkwqszixz.streamlit.app/)
+
+A machine learning tool that detects fraudulent job postings using NLP techniques, helping job seekers identify scam listings before applying.
 
 ## Problem
 Fake job postings are a real, growing scam risk for job seekers. This project detects fraudulent postings using text analysis and machine learning, so applicants can screen listings before applying.
@@ -23,4 +25,4 @@ Fake job postings are a real, growing scam risk for job seekers. This project de
 | F1-score (fraud) | 0.77 |
 
 ## Tools Used
-Python, pandas, scikit-learn, imbalanced-learn (SMOTE), Jupyter/Colab
+Python, pandas, scikit-learn, imbalanced-learn (SMOTE), Jupyter/Colab, Streamlit (deployment)
