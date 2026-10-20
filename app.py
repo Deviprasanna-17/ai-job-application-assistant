@@ -2,6 +2,7 @@ import streamlit as st
 import joblib
 import re
 import numpy as np
+from pypdf import PdfReader
 
 MIN_WORDS = 20
 THRESHOLD = 0.4
@@ -74,12 +75,25 @@ def big_box(text, bg, size):
         f"<div style='background:{bg};padding:18px;border-radius:10px;"
         f"font-size:{size}px;font-weight:700;color:white;text-align:center'>{text}</div>",
         unsafe_allow_html=True)
+def extract_text(file):
+    if file.name.lower().endswith(".pdf"):
+        reader = PdfReader(file)
+        return "\n".join((page.extract_text() or "") for page in reader.pages)
+    return file.read().decode("utf-8", errors="ignore")
 
 st.title("Fake Job Posting Detector")
 st.write("Paste a job posting below to check if it looks fraudulent.")
 
 company_text = st.text_area("Company Profile (optional)", height=100)
-job_text = st.text_area("Job Posting Text", height=200)
+uploaded = st.file_uploader("Or upload the job posting (PDF or TXT)", type=["pdf", "txt"])
+if uploaded is not None and st.session_state.get("last_file") != uploaded.name:
+    extracted = extract_text(uploaded)
+    st.session_state.last_file = uploaded.name
+    st.session_state.job_text = extracted
+    if extracted.strip() == "":
+        st.warning("No text could be read from this file. It may be a scanned image PDF. Please paste the text instead.")
+
+job_text = st.text_area("Job Posting Text", height=200, key="job_text")
 
 if st.button("Check"):
     if job_text.strip() == "":
