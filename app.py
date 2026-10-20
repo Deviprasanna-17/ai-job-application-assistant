@@ -36,30 +36,44 @@ def find_signals(text):
             found.append(label)
     return found
 
-def find_missing(job_text, company_text):
-    missing = []
-    if company_text.strip() == "":
-        missing.append("Company details are missing")
-    if not re.search(r"responsibilit|duties|you will|role involves|key tasks", job_text, flags=re.IGNORECASE):
-        missing.append("Job responsibilities are not clearly mentioned")
-    if not re.search(r"salary|\bctc\b|\blpa\b|stipend|per month|per annum|compensation|₹|\brs\b|\$", job_text, flags=re.IGNORECASE):
-        missing.append("Salary details are missing")
-    return missing
+def has(pattern, text):
+    return re.search(pattern, text, flags=re.IGNORECASE) is not None
 
-def explain_words(vector, base_prob):
+def check_information(job_text, company_text):
+    combined = job_text + " " + company_text
+    company = company_text.strip() != "" or has(
+        r"about (?:us|the company)|company (?:profile|overview)|who we are|\b(?:pvt|private|ltd|limited|llp|inc|corp|technologies|solutions|systems|services)\b",
+        combined)
+    responsibilities = has(r"responsibilit|duties|you will|role involves|key tasks", combined)
+    salary = has(r"salary|\bctc\b|\blpa\b|stipend|per month|per annum|compensation|₹|\brs\b|\$", combined)
+    address = has(r"address|located (?:at|in)|office (?:at|in)|\b\d{6}\b|\+?\d[\d\s\-]{9,}|@[a-z0-9\-]+\.[a-z]{2,}", combined)
+    return [
+        {"Information": "Company details", "Status": "✅ Mentioned" if company else "❌ Not found"},
+        {"Information": "Job responsibilities", "Status": "✅ Mentioned" if responsibilities else "❌ Not found"},
+        {"Information": "Salary details", "Status": "✅ Mentioned" if salary else "❌ Not found"},
+        {"Information": "Company address / contact", "Status": "✅ Mentioned" if address else "❌ Not found"},
+    ]
+
+def explain_words(vector, base_prob, cap=250):
     row = vector.toarray()[0]
     present = row.nonzero()[0]
     if len(present) == 0:
         return []
-    candidates = sorted(present, key=lambda i: row[i], reverse=True)[:30]
-    matrix = np.tile(row, (len(candidates), 1))
-    for r, i in enumerate(candidates):
-        matrix[r, i] = 0
+    if len(present) > cap:
+        present = present[np.argsort(row[present])[::-1][:cap]]
+    matrix = np.tile(row, (len(present), 1))
+    matrix[np.arange(len(present)), present] = 0
     probs = rf_model_smote.predict_proba(matrix)[:, 1]
-    results = [(feature_names[i], base_prob - p) for i, p in zip(candidates, probs)]
-    results = [x for x in results if abs(x[1]) > 0.0005]
+    deltas = base_prob - probs
+    results = [(feature_names[i], d) for i, d in zip(present, deltas) if abs(d) > 0.0005]
     results.sort(key=lambda x: abs(x[1]), reverse=True)
     return results[:5]
+
+def big_box(text, bg, size):
+    st.markdown(
+        f"<div style='background:{bg};padding:18px;border-radius:10px;"
+        f"font-size:{size}px;font-weight:700;color:white;text-align:center'>{text}</div>",
+        unsafe_allow_html=True)
 
 st.title("Fake Job Posting Detector")
 st.write("Paste a job posting below to check if it looks fraudulent.")
@@ -79,39 +93,50 @@ if st.button("Check"):
         probability = rf_model_smote.predict_proba(vector)[:, 1][0]
 
         if probability >= THRESHOLD:
-            st.error("FRAUD DETECTED ⚠️")
+            big_box("FRAUD DETECTED ⚠️", "#c62828", 34)
         else:
-            st.success("LIKELY GENUINE ✅")
+            big_box("LIKELY GENUINE ✅", "#2e7d32", 34)
         st.progress(float(probability))
-        st.write(f"Estimated fraud probability: {probability:.0%}")
+        st.markdown(f"## Estimated fraud probability: {probability:.0%}")
 
-        st.subheader("Why this result? (top 5 words)")
+        st.markdown("## Top 5 Words Influencing This Prediction")
         words = explain_words(vector, probability)
         if not words:
-            st.info("No strong word-level signals found.")
-        for word, delta in words:
-            if delta > 0:
-                st.write(f"- **{word}**: increases fraud score ({delta*100:+.1f} points)")
-            else:
-                st.write(f"- **{word}**: decreases fraud score ({delta*100:+.1f} points)")
+            st.info("No strong word-level influence found.")
+        else:
+            inc = [(w, d) for w, d in words if d > 0]
+            dec = [(w, d) for w, d in words if d < 0]
+            c1, c2 = st.columns(2)
+            with c1:
+                st.markdown("### 🔺 Increase fraud score")
+                if inc:
+                    for w, d in inc:
+                        st.markdown(f"**{w}**  ({d*100:+.1f} points)")
+                else:
+                    st.write("None in top 5")
+            with c2:
+                st.markdown("### 🔻 Decrease fraud score")
+                if dec:
+                    for w, d in dec:
+                        st.markdown(f"**{w}**  ({d*100:+.1f} points)")
+                else:
+                    st.write("None in top 5")
+        st.caption("Each value shows how much the fraud score changes when that word is removed. "
+                   "Words alone do not decide the result. The full job description context matters.")
 
-        st.subheader("Suspicious signals")
+        st.markdown("## Suspicious signals")
         signals = find_signals(user_input)
         if signals:
             for s in signals:
-                st.write("- ⚠️ " + s)
+                st.markdown(f"### ⚠️ {s}")
         else:
             st.write("No known suspicious patterns found.")
 
-        st.subheader("Missing information")
-        missing = find_missing(job_text, company_text)
-        if missing:
-            for m in missing:
-                st.write("- " + m)
-        else:
-            st.write("Company, responsibilities and salary details are present.")
+        st.markdown("## Information check")
+        st.table(check_information(job_text, company_text))
+        st.caption("'Mentioned' only means the text contains it. It does not prove the company is genuine.")
 
-        st.subheader("Safety recommendation")
-        st.info("Verify the employer's official website, company email domain and contact details. Never pay money for a job.")
+        st.markdown("## Safety recommendation")
+        big_box("Verify the employer's official website, company email domain and contact details. Never pay money for a job.", "#ef6c00", 20)
 
         st.caption("This prediction is not a guarantee. Verify the employer before sharing money or personal information.")
