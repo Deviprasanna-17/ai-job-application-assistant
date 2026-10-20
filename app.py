@@ -4,6 +4,40 @@ import re
 import numpy as np
 from pypdf import PdfReader
 
+st.set_page_config(page_title="Fake Job Posting Detector", page_icon="🛡️", layout="centered")
+
+st.markdown("""
+<style>
+.stApp {background: linear-gradient(135deg, #e0f2fe 0%, #fce7f3 50%, #ede9fe 100%);}
+.hero {background: linear-gradient(90deg, #7c3aed, #ec4899, #f97316); padding: 28px; border-radius: 22px; color: white; text-align: center; box-shadow: 0 8px 24px rgba(124,58,237,0.35); margin-bottom: 22px;}
+.hero h1 {color: white; font-size: 38px; margin: 0; font-weight: 800;}
+.hero p {color: #fff7ed; font-size: 18px; margin: 8px 0 0 0;}
+.stTextArea textarea {background: #ffffff; border: 2px solid #c4b5fd; border-radius: 12px; font-size: 16px;}
+.stButton > button {background: linear-gradient(90deg, #7c3aed, #ec4899); color: white; border: none; border-radius: 12px; padding: 0.6rem 2.2rem; font-weight: 800; font-size: 18px; box-shadow: 0 4px 14px rgba(236,72,153,0.4);}
+.stButton > button:hover {color: white; transform: scale(1.03);}
+.sec {font-size: 26px; font-weight: 800; color: #4c1d95; margin: 30px 0 10px 0; border-left: 6px solid #ec4899; padding-left: 12px;}
+.sub-red {font-size: 20px; font-weight: 800; color: #b91c1c; margin-bottom: 6px;}
+.sub-green {font-size: 20px; font-weight: 800; color: #15803d; margin-bottom: 6px;}
+.result {display: flex; gap: 26px; align-items: center; padding: 24px; border-radius: 22px; color: white; box-shadow: 0 8px 24px rgba(0,0,0,0.18);}
+.result.fraud {background: linear-gradient(135deg, #ef4444, #f97316);}
+.result.genuine {background: linear-gradient(135deg, #10b981, #06b6d4);}
+.gauge {width: 120px; height: 120px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;}
+.gauge-in {width: 88px; height: 88px; border-radius: 50%; background: white; display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 800; color: #111827;}
+.r-title {font-size: 34px; font-weight: 800;}
+.r-sub {font-size: 19px; margin-top: 6px;}
+.chip {display: inline-block; padding: 8px 15px; border-radius: 999px; margin: 4px 6px 4px 0; font-weight: 700; font-size: 16px;}
+.chip-red {background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5;}
+.chip-green {background: #dcfce7; color: #166534; border: 1px solid #86efac;}
+.chip-orange {background: #ffedd5; color: #9a3412; border: 1px solid #fdba74;}
+.grid {display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;}
+.info {padding: 14px 16px; border-radius: 14px; font-weight: 700; font-size: 17px;}
+.ok {background: #dcfce7; color: #166534; border: 1px solid #86efac;}
+.no {background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5;}
+.safety {background: linear-gradient(135deg, #fde68a, #fdba74); color: #7c2d12; padding: 18px; border-radius: 16px; font-size: 20px; font-weight: 700;}
+.note {font-size: 14px; color: #6b7280; margin-top: 8px;}
+</style>
+""", unsafe_allow_html=True)
+
 MIN_WORDS = 20
 THRESHOLD = 0.4
 
@@ -49,10 +83,10 @@ def check_information(job_text, company_text):
     salary = has(r"salary|\bctc\b|\blpa\b|stipend|per month|per annum|compensation|₹|\brs\b|\$", combined)
     address = has(r"address|located (?:at|in)|office (?:at|in)|\b\d{6}\b|\+?\d[\d\s\-]{9,}|@[a-z0-9\-]+\.[a-z]{2,}", combined)
     return [
-        {"Information": "Company details", "Status": "✅ Mentioned" if company else "❌ Not found"},
-        {"Information": "Job responsibilities", "Status": "✅ Mentioned" if responsibilities else "❌ Not found"},
-        {"Information": "Salary details", "Status": "✅ Mentioned" if salary else "❌ Not found"},
-        {"Information": "Company address / contact", "Status": "✅ Mentioned" if address else "❌ Not found"},
+        ("Company details", company),
+        ("Job responsibilities", responsibilities),
+        ("Salary details", salary),
+        ("Company address / contact", address),
     ]
 
 def explain_words(vector, base_prob, cap=250):
@@ -70,21 +104,23 @@ def explain_words(vector, base_prob, cap=250):
     results.sort(key=lambda x: abs(x[1]), reverse=True)
     return results[:5]
 
-def big_box(text, bg, size):
-    st.markdown(
-        f"<div style='background:{bg};padding:18px;border-radius:10px;"
-        f"font-size:{size}px;font-weight:700;color:white;text-align:center'>{text}</div>",
-        unsafe_allow_html=True)
 def extract_text(file):
+    file.seek(0)
     if file.name.lower().endswith(".pdf"):
         reader = PdfReader(file)
         return "\n".join((page.extract_text() or "") for page in reader.pages)
     return file.read().decode("utf-8", errors="ignore")
 
-st.title("Fake Job Posting Detector")
-st.write("Paste a job posting below to check if it looks fraudulent.")
+def section(title):
+    st.markdown(f"<div class='sec'>{title}</div>", unsafe_allow_html=True)
+
+def chips_html(items, css):
+    return "".join(f"<span class='chip {css}'>{text}</span>" for text in items)
+
+st.markdown("<div class='hero'><h1>🛡️ Fake Job Posting Detector</h1><p>Paste or upload a job posting and check if it looks fraudulent</p></div>", unsafe_allow_html=True)
 
 company_text = st.text_area("Company Profile (optional)", height=100)
+
 uploaded = st.file_uploader("Or upload the job posting (PDF or TXT)", type=["pdf", "txt"])
 if uploaded is not None and st.session_state.get("last_file") != uploaded.name:
     extracted = extract_text(uploaded)
@@ -92,12 +128,16 @@ if uploaded is not None and st.session_state.get("last_file") != uploaded.name:
     st.session_state.job_text = extracted
     if extracted.strip() == "":
         st.warning("No text could be read from this file. It may be a scanned image PDF. Please paste the text instead.")
+    else:
+        st.success(f"Read {len(extracted.split())} words from {uploaded.name}")
 
 job_text = st.text_area("Job Posting Text", height=200, key="job_text")
 
 if st.button("Check"):
+    if job_text.strip() == "" and uploaded is not None:
+        job_text = extract_text(uploaded)
     if job_text.strip() == "":
-        st.warning("Please enter the job posting text.")
+        st.warning("Please upload a PDF or enter the job posting text.")
     elif len(job_text.split()) < MIN_WORDS:
         st.warning(f"Text is too short. Please paste the full job description (at least {MIN_WORDS} words) for a reliable result.")
     else:
@@ -105,52 +145,49 @@ if st.button("Check"):
         cleaned = clean_text(user_input)
         vector = tfidf_vectorizer.transform([cleaned])
         probability = rf_model_smote.predict_proba(vector)[:, 1][0]
+        pct = round(probability * 100)
 
         if probability >= THRESHOLD:
-            big_box("FRAUD DETECTED ⚠️", "#c62828", 34)
+            cls, title, gcolor = "fraud", "FRAUD DETECTED ⚠️", "#ef4444"
         else:
-            big_box("LIKELY GENUINE ✅", "#2e7d32", 34)
-        st.progress(float(probability))
-        st.markdown(f"## Estimated fraud probability: {probability:.0%}")
+            cls, title, gcolor = "genuine", "LIKELY GENUINE ✅", "#10b981"
+        st.markdown(
+            f"<div class='result {cls}'><div class='gauge' style='background: conic-gradient({gcolor} {pct}%, #e5e7eb 0);'>"
+            f"<div class='gauge-in'>{pct}%</div></div>"
+            f"<div><div class='r-title'>{title}</div><div class='r-sub'>Estimated fraud probability: {pct}%</div></div></div>",
+            unsafe_allow_html=True)
 
-        st.markdown("## Top 5 Words Influencing This Prediction")
+        section("🔍 Top 5 Words Influencing This Prediction")
         words = explain_words(vector, probability)
         if not words:
             st.info("No strong word-level influence found.")
         else:
-            inc = [(w, d) for w, d in words if d > 0]
-            dec = [(w, d) for w, d in words if d < 0]
+            inc = [f"{w} ({d*100:+.1f})" for w, d in words if d > 0]
+            dec = [f"{w} ({d*100:+.1f})" for w, d in words if d < 0]
             c1, c2 = st.columns(2)
             with c1:
-                st.markdown("### 🔺 Increase fraud score")
-                if inc:
-                    for w, d in inc:
-                        st.markdown(f"**{w}**  ({d*100:+.1f} points)")
-                else:
-                    st.write("None in top 5")
+                st.markdown("<div class='sub-red'>🔺 Increase fraud score</div>", unsafe_allow_html=True)
+                st.markdown(chips_html(inc, "chip-red") if inc else "None in top 5", unsafe_allow_html=True)
             with c2:
-                st.markdown("### 🔻 Decrease fraud score")
-                if dec:
-                    for w, d in dec:
-                        st.markdown(f"**{w}**  ({d*100:+.1f} points)")
-                else:
-                    st.write("None in top 5")
-        st.caption("Each value shows how much the fraud score changes when that word is removed. "
-                   "Words alone do not decide the result. The full job description context matters.")
+                st.markdown("<div class='sub-green'>🔻 Decrease fraud score</div>", unsafe_allow_html=True)
+                st.markdown(chips_html(dec, "chip-green") if dec else "None in top 5", unsafe_allow_html=True)
+        st.markdown("<div class='note'>Each value shows how many points the fraud score changes when that word is removed. Words alone do not decide the result. The full job description context matters.</div>", unsafe_allow_html=True)
 
-        st.markdown("## Suspicious signals")
+        section("🚩 Suspicious signals")
         signals = find_signals(user_input)
         if signals:
-            for s in signals:
-                st.markdown(f"### ⚠️ {s}")
+            st.markdown(chips_html([f"⚠️ {s}" for s in signals], "chip-orange"), unsafe_allow_html=True)
         else:
-            st.write("No known suspicious patterns found.")
+            st.markdown(chips_html(["✅ No known suspicious patterns found"], "chip-green"), unsafe_allow_html=True)
 
-        st.markdown("## Information check")
-        st.table(check_information(job_text, company_text))
-        st.caption("'Mentioned' only means the text contains it. It does not prove the company is genuine.")
+        section("📋 Information check")
+        cards = "".join(
+            f"<div class='info {'ok' if ok else 'no'}'>{'✅' if ok else '❌'} {label}: {'Mentioned' if ok else 'Not found'}</div>"
+            for label, ok in check_information(job_text, company_text))
+        st.markdown(f"<div class='grid'>{cards}</div>", unsafe_allow_html=True)
+        st.markdown("<div class='note'>'Mentioned' only means the text contains it. It does not prove the company is genuine.</div>", unsafe_allow_html=True)
 
-        st.markdown("## Safety recommendation")
-        big_box("Verify the employer's official website, company email domain and contact details. Never pay money for a job.", "#ef6c00", 20)
+        section("🛡️ Safety recommendation")
+        st.markdown("<div class='safety'>Verify the employer's official website, company email domain and contact details. Never pay money for a job.</div>", unsafe_allow_html=True)
 
-        st.caption("This prediction is not a guarantee. Verify the employer before sharing money or personal information.")
+        st.markdown("<div class='note'>This prediction is not a guarantee. Verify the employer before sharing money or personal information.</div>", unsafe_allow_html=True)
