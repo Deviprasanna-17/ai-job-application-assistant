@@ -22,7 +22,7 @@ Fake job postings are a real, growing scam risk for job seekers. This project de
 |---|---|
 | Precision (fraud) | 0.86 |
 | Recall (fraud) | 0.71 |
-| F1-score (fraud) | 0.77 |
+| F1-score (fraud) | 0.78 |
 
 ## Web App Features
 - Fraud / genuine prediction with an estimated fraud probability
