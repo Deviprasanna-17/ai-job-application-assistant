@@ -24,5 +24,19 @@ Fake job postings are a real, growing scam risk for job seekers. This project de
 | Recall (fraud) | 0.71 |
 | F1-score (fraud) | 0.77 |
 
+## Web App Features
+- Fraud / genuine prediction with an estimated fraud probability
+- Top 5 words influencing the prediction (increase vs decrease fraud score), calculated by removing each word and measuring the change in model score
+- Rule-based suspicious signals (upfront fee, bank details asked, unrealistic salary promise, urgency, chat-app contact, free email)
+- Information check (company details, responsibilities, salary, address/contact)
+- PDF / TXT upload, input validation, safety recommendation and disclaimer
+
+## Limitations
+- The model uses text only; it does not verify the company or its website.
+- The probability is a model score, not a guaranteed chance of fraud.
+- Suspicious signals and the information check are keyword-based rules, so they can give false alarms.
+- Scanned image PDFs cannot be read (no OCR).
+
+
 ## Tools Used
-Python, pandas, scikit-learn, imbalanced-learn (SMOTE), Jupyter/Colab, Streamlit (deployment)
+Python, pandas, scikit-learn, imbalanced-learn (SMOTE), Streamlit, pypdf, Jupyter/Colab, Git/GitHub.
